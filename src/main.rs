@@ -1,4 +1,5 @@
 use std::fmt::{self, Display};
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::{env, net::TcpListener, process};
@@ -68,9 +69,11 @@ fn handle_connection(mut stream: TcpStream) {
 
     println!("Request: {http_request:#?}");
 
+    let body = fs::read_to_string("index.html").unwrap();
+
     let response = HttpResponse {
         code: HttpCode::OK,
-        body: "Hello World".to_string(),
+        body,
     };
 
     stream.write_all(response.to_string().as_bytes()).unwrap();
