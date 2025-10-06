@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Display};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::{env, net::TcpListener, process};
@@ -27,20 +27,33 @@ fn main() {
     }
 }
 
-struct HTTPResponse {
-    code: i16,
+struct HttpResponse {
+    code: HttpCode,
     body: String,
 }
 
-impl fmt::Display for HTTPResponse {
+impl fmt::Display for HttpResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let resp_header = format!("HTTP/1.1 {} OK", self.code);
+        let resp_header = format!("HTTP/1.1 {}", self.code);
         write!(
             f,
             "{resp_header}\r\nContent-Length: {}\r\n\r\n{}",
             self.body.len(),
             self.body
         )
+    }
+}
+
+enum HttpCode {
+    OK,
+}
+
+impl Display for HttpCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (code, val) = match self {
+            HttpCode::OK => (200, "OK".to_string()),
+        };
+        write!(f, "{} {}", code, val)
     }
 }
 
@@ -55,8 +68,8 @@ fn handle_connection(mut stream: TcpStream) {
 
     println!("Request: {http_request:#?}");
 
-    let response = HTTPResponse {
-        code: 200,
+    let response = HttpResponse {
+        code: HttpCode::OK,
         body: "Hello World".to_string(),
     };
 
