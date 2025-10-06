@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -28,6 +29,21 @@ fn main() {
     }
 }
 
+struct HttpRequest {
+    verb: HttpVerb,
+    protocol: HttpProtocol,
+    headers: HashMap<String, String>,
+}
+
+enum HttpProtocol {
+    OnePointOne,
+}
+enum HttpVerb {
+    Get,
+    Post,
+    Put,
+}
+
 struct HttpResponse {
     code: HttpCode,
     body: String,
@@ -46,13 +62,15 @@ impl fmt::Display for HttpResponse {
 }
 
 enum HttpCode {
-    OK,
+    Ok,
+    NotFound,
 }
 
 impl Display for HttpCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (code, val) = match self {
-            HttpCode::OK => (200, "OK".to_string()),
+            HttpCode::Ok => (200, "OK".to_string()),
+            HttpCode::NotFound => (404, "NOT FOUND".to_string()),
         };
         write!(f, "{} {}", code, val)
     }
@@ -72,7 +90,7 @@ fn handle_connection(mut stream: TcpStream) {
     let body = fs::read_to_string("index.html").unwrap();
 
     let response = HttpResponse {
-        code: HttpCode::OK,
+        code: HttpCode::Ok,
         body,
     };
 
