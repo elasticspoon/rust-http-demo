@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::{env, net::TcpListener, process};
@@ -26,6 +27,23 @@ fn main() {
     }
 }
 
+struct HTTPResponse {
+    code: i16,
+    body: String,
+}
+
+impl fmt::Display for HTTPResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let resp_header = format!("HTTP/1.1 {} OK", self.code);
+        write!(
+            f,
+            "{resp_header}\r\nContent-Length: {}\r\n\r\n{}",
+            self.body.len(),
+            self.body
+        )
+    }
+}
+
 fn handle_connection(mut stream: TcpStream) {
     let buf_reader = BufReader::new(&stream);
 
@@ -37,7 +55,10 @@ fn handle_connection(mut stream: TcpStream) {
 
     println!("Request: {http_request:#?}");
 
-    let response = "HTTP/1.1 200 OK\r\n\r\n";
+    let response = HTTPResponse {
+        code: 200,
+        body: "Hello World".to_string(),
+    };
 
-    stream.write_all(response.as_bytes()).unwrap();
+    stream.write_all(response.to_string().as_bytes()).unwrap();
 }
