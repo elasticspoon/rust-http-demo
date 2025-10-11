@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::str::FromStr;
 use std::{env, net::TcpListener, process};
@@ -39,28 +39,44 @@ struct HttpRequest {
 }
 
 impl HttpRequest {
-    fn build(request: Vec<String>) -> Result<HttpRequest, String> {
-        let header: Vec<&str> = request
-            .first()
-            .expect("should container a header")
-            .split(" ")
-            .collect();
-        if let (Some(verb), Some(path), Some(protocol)) =
-            (header.first(), header.get(1), header.get(2))
-        {
-            let path = (**path).to_string();
-            let verb = HttpVerb::from_str(verb)?;
-            let protocol = HttpProtocol::from_str(protocol)?;
-            Ok(HttpRequest {
-                verb,
-                path,
-                protocol,
-                headers: HashMap::new(),
-                body: None,
+    fn build(request: &mut dyn BufRead) -> Result<HttpRequest, String> {
+        let header_line = request.lines().next().unwrap().unwrap();
+        let (verb, path, protocol) = build_start_line(header_line)?;
+
+        let headers: HashMap<String, String> = request
+            .lines()
+            .map(|res| res.unwrap())
+            .take_while(|line| !line.is_empty())
+            .filter_map(|line| {
+                line.split_once(": ")
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
             })
-        } else {
-            Err(format!("invalid header: {:#?}", header))
-        }
+            .collect();
+        println!("{:#?}", headers);
+
+        // TODO: get request body
+
+        Ok(HttpRequest {
+            verb,
+            path,
+            protocol,
+            headers,
+            body: None,
+        })
+    }
+}
+
+fn build_start_line(binding: String) -> Result<(HttpVerb, String, HttpProtocol), String> {
+    let mut start_line = binding.split(" ");
+    if let (Some(verb), Some(path), Some(protocol)) =
+        (start_line.next(), start_line.next(), start_line.next())
+    {
+        let path = path.to_string();
+        let verb = HttpVerb::from_str(verb)?;
+        let protocol = HttpProtocol::from_str(protocol)?;
+        Ok((verb, path, protocol))
+    } else {
+        Err(format!("invalid start line: {:#?}", start_line))
     }
 }
 
@@ -162,22 +178,32 @@ impl Display for HttpCode {
 }
 
 fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&stream);
+    let mut buf_reader = BufReader::new(&stream);
+    // let mut buf_reader = BufReader::new(&stream);
+    // let mut res = String::new();
+    // let req = buf_reader.read_to_string(&mut res).unwrap();
+    // println!("{:#?}", res);
+    // TODO: this does not do anything with the reponse body
+    // it comes after \r\n\r\n and is size of Content-Length
 
-    let http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|res| res.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
-    println!("Request: {http_request:#?}");
-    let http_request = HttpRequest::build(http_request).unwrap();
+    let http_request = HttpRequest::build(&mut buf_reader).unwrap();
     print!("{http_request}");
-
-    let body = fs::read_to_string("index.html").unwrap();
-    let response = HttpResponse {
-        code: HttpCode::Ok,
-        body,
+    let handler = match (&http_request.verb, http_request.path.as_str()) {
+        (HttpVerb::Get, "/") => Some(|_| fs::read_to_string("index.html").unwrap()),
+        _ => None,
     };
 
+    let response = match handler {
+        Some(handler) => HttpResponse {
+            code: HttpCode::Ok,
+            body: handler(http_request),
+        },
+        None => HttpResponse {
+            code: HttpCode::NotFound,
+            body: "".to_string(),
+        },
+    };
+
+    println!("{response}");
     stream.write_all(response.to_string().as_bytes()).unwrap();
 }
