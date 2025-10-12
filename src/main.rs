@@ -52,16 +52,23 @@ impl HttpRequest {
                     .map(|(k, v)| (k.to_string(), v.to_string()))
             })
             .collect();
-        println!("{:#?}", headers);
 
-        // TODO: get request body
+        let body = if let Some(len) = headers.get("Content-Length") {
+            // TODO use Box dyn Error
+            let body_len: usize = len.parse().unwrap();
+            let mut buffer = vec![0u8; body_len];
+            request.read_exact(&mut buffer).unwrap();
+            Some(String::from_utf8(buffer).unwrap())
+        } else {
+            None
+        };
 
         Ok(HttpRequest {
             verb,
             path,
             protocol,
             headers,
-            body: None,
+            body,
         })
     }
 }
@@ -82,12 +89,14 @@ fn build_start_line(binding: String) -> Result<(HttpVerb, String, HttpProtocol),
 
 impl Display for HttpRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let body = self.body.as_deref().unwrap_or("");
         write!(
             f,
-            "{verb} {path} {protocol}\r\n\r\n",
+            "{verb} {path} {protocol}\r\n{headers:#?}\r\n\r\n{body:?}",
             verb = self.verb,
             path = self.path,
             protocol = self.protocol,
+            headers = self.headers,
         )
     }
 }
@@ -204,6 +213,6 @@ fn handle_connection(mut stream: TcpStream) {
         },
     };
 
-    println!("{response}");
+    println!("\r\nResponse:\r\n{response}");
     stream.write_all(response.to_string().as_bytes()).unwrap();
 }
