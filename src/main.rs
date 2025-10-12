@@ -1,10 +1,12 @@
-use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::{self, Display};
 use std::fs;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::str::FromStr;
 use std::{env, net::TcpListener, process};
+mod http_request;
+use http_request::HttpRequest;
 
 fn main() {
     // let port = env::var("PORT").map_or_else(|_| 3000, |port| port.parse::<i32>().unwrap_or(3000));
@@ -30,88 +32,20 @@ fn main() {
     }
 }
 
-struct HttpRequest {
-    verb: HttpVerb,
-    protocol: HttpProtocol,
-    path: String,
-    headers: HashMap<String, String>,
-    body: Option<String>,
-}
-
-impl HttpRequest {
-    fn build(request: &mut dyn BufRead) -> Result<HttpRequest, String> {
-        let header_line = request.lines().next().unwrap().unwrap();
-        let (verb, path, protocol) = build_start_line(header_line)?;
-
-        let headers: HashMap<String, String> = request
-            .lines()
-            .map(|res| res.unwrap())
-            .take_while(|line| !line.is_empty())
-            .filter_map(|line| {
-                line.split_once(": ")
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-            })
-            .collect();
-
-        let body = if let Some(len) = headers.get("Content-Length") {
-            // TODO use Box dyn Error
-            let body_len: usize = len.parse().unwrap();
-            let mut buffer = vec![0u8; body_len];
-            request.read_exact(&mut buffer).unwrap();
-            Some(String::from_utf8(buffer).unwrap())
-        } else {
-            None
-        };
-
-        Ok(HttpRequest {
-            verb,
-            path,
-            protocol,
-            headers,
-            body,
-        })
-    }
-}
-
-fn build_start_line(binding: String) -> Result<(HttpVerb, String, HttpProtocol), String> {
-    let mut start_line = binding.split(" ");
-    if let (Some(verb), Some(path), Some(protocol)) =
-        (start_line.next(), start_line.next(), start_line.next())
-    {
-        let path = path.to_string();
-        let verb = HttpVerb::from_str(verb)?;
-        let protocol = HttpProtocol::from_str(protocol)?;
-        Ok((verb, path, protocol))
-    } else {
-        Err(format!("invalid start line: {:#?}", start_line))
-    }
-}
-
-impl Display for HttpRequest {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let body = self.body.as_deref().unwrap_or("");
-        write!(
-            f,
-            "{verb} {path} {protocol}\r\n{headers:#?}\r\n\r\n{body:?}",
-            verb = self.verb,
-            path = self.path,
-            protocol = self.protocol,
-            headers = self.headers,
-        )
-    }
-}
-
-enum HttpProtocol {
+#[derive(Debug, PartialEq)]
+pub enum HttpProtocol {
     OnePointOne,
 }
 
 impl FromStr for HttpProtocol {
-    type Err = String;
+    type Err = MalformedRequest;
 
     fn from_str(protocol: &str) -> Result<Self, Self::Err> {
         match protocol {
             "HTTP/1.1" => Ok(HttpProtocol::OnePointOne),
-            _ => Err(format!("invalid HttpProtocol: {}", protocol)),
+            _ => Err(MalformedRequest {
+                error: format!("unsupported protocol: {}", protocol),
+            }),
         }
     }
 }
@@ -124,7 +58,8 @@ impl Display for HttpProtocol {
         write!(f, "{protocol}")
     }
 }
-enum HttpVerb {
+#[derive(Debug, PartialEq)]
+pub enum HttpVerb {
     Get,
     Post,
     Put,
@@ -149,7 +84,7 @@ impl FromStr for HttpVerb {
             "GET" => Ok(HttpVerb::Get),
             "POST" => Ok(HttpVerb::Post),
             "PUT" => Ok(HttpVerb::Put),
-            _ => Err(format!("cannot covert {verb} to HttpVerb.")),
+            _ => Err(format!("Invalid HTTP verb: '{verb}'")),
         }
     }
 }
@@ -186,15 +121,21 @@ impl Display for HttpCode {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MalformedRequest {
+    error: String,
+}
+
+impl Display for MalformedRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid request: {}", self.error)
+    }
+}
+
+impl Error for MalformedRequest {}
+
 fn handle_connection(mut stream: TcpStream) {
     let mut buf_reader = BufReader::new(&stream);
-    // let mut buf_reader = BufReader::new(&stream);
-    // let mut res = String::new();
-    // let req = buf_reader.read_to_string(&mut res).unwrap();
-    // println!("{:#?}", res);
-    // TODO: this does not do anything with the reponse body
-    // it comes after \r\n\r\n and is size of Content-Length
-
     let http_request = HttpRequest::build(&mut buf_reader).unwrap();
     print!("{http_request}");
     let handler = match (&http_request.verb, http_request.path.as_str()) {
