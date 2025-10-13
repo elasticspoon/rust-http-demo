@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fmt::{self, Display};
 use std::fs;
 use std::io::{BufReader, Write};
@@ -38,14 +37,15 @@ pub enum HttpProtocol {
 }
 
 impl FromStr for HttpProtocol {
-    type Err = MalformedRequest;
+    type Err = ();
 
     fn from_str(protocol: &str) -> Result<Self, Self::Err> {
         match protocol {
             "HTTP/1.1" => Ok(HttpProtocol::OnePointOne),
-            _ => Err(MalformedRequest {
-                error: format!("unsupported protocol: {}", protocol),
-            }),
+            _ => {
+                eprintln!("ERROR: invalid protocol in request: '{protocol}'");
+                Err(())
+            }
         }
     }
 }
@@ -77,14 +77,17 @@ impl Display for HttpVerb {
 }
 
 impl FromStr for HttpVerb {
-    type Err = String;
+    type Err = ();
 
     fn from_str(verb: &str) -> Result<Self, Self::Err> {
         match verb {
             "GET" => Ok(HttpVerb::Get),
             "POST" => Ok(HttpVerb::Post),
             "PUT" => Ok(HttpVerb::Put),
-            _ => Err(format!("Invalid HTTP verb: '{verb}'")),
+            _ => {
+                eprintln!("ERROR: Invalid HTTP verb: '{verb}'");
+                Err(())
+            }
         }
     }
 }
@@ -120,19 +123,6 @@ impl Display for HttpCode {
         write!(f, "{} {}", code, val)
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct MalformedRequest {
-    error: String,
-}
-
-impl Display for MalformedRequest {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "invalid request: {}", self.error)
-    }
-}
-
-impl Error for MalformedRequest {}
 
 fn handle_connection(mut stream: TcpStream) {
     let mut buf_reader = BufReader::new(&stream);
