@@ -24,7 +24,7 @@ fn main() {
         match conn {
             Ok(stream) => {
                 println!("Accepted connection");
-                handle_connection(stream);
+                let _ = handle_connection(stream);
             }
             Err(err) => println!("failled to accept connection: {:?}", err),
         }
@@ -124,9 +124,10 @@ impl Display for HttpCode {
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
     let mut buf_reader = BufReader::new(&stream);
-    let http_request = HttpRequest::build(&mut buf_reader).unwrap();
+    // TODO: how should a server respond to a malformed request?
+    let http_request = HttpRequest::build(&mut buf_reader)?;
     print!("{http_request}");
     let handler = match (&http_request.verb, http_request.path.as_str()) {
         (HttpVerb::Get, "/") => Some(|_| fs::read_to_string("index.html").unwrap()),
@@ -146,4 +147,5 @@ fn handle_connection(mut stream: TcpStream) {
 
     println!("\r\nResponse:\r\n{response}");
     stream.write_all(response.to_string().as_bytes()).unwrap();
+    Ok(())
 }
