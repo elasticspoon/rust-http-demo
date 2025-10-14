@@ -112,6 +112,7 @@ impl fmt::Display for HttpResponse {
 enum HttpCode {
     Ok,
     NotFound,
+    BadRequest,
 }
 
 impl Display for HttpCode {
@@ -119,6 +120,7 @@ impl Display for HttpCode {
         let (code, val) = match self {
             HttpCode::Ok => (200, "OK".to_string()),
             HttpCode::NotFound => (404, "NOT FOUND".to_string()),
+            HttpCode::BadRequest => (400, "BAD REQUEST".to_string()),
         };
         write!(f, "{} {}", code, val)
     }
@@ -126,9 +128,15 @@ impl Display for HttpCode {
 
 fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
     let mut buf_reader = BufReader::new(&stream);
-    // TODO: how should a server respond to a malformed request?
-    let http_request = HttpRequest::build(&mut buf_reader)?;
-    print!("{http_request}");
+    let http_request = HttpRequest::build(&mut buf_reader).map_err(|_| {
+        let response = HttpResponse {
+            code: HttpCode::BadRequest,
+            body: "Bad Request".to_string(),
+        };
+        let _ = stream
+            .write_all(response.to_string().as_bytes())
+            .map_err(|err| eprintln!("Failed to write {response}: {err}"));
+    })?;
     let handler = match (&http_request.verb, http_request.path.as_str()) {
         (HttpVerb::Get, "/") => Some(|_| fs::read_to_string("index.html").unwrap()),
         _ => None,
@@ -146,6 +154,8 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
     };
 
     println!("\r\nResponse:\r\n{response}");
-    stream.write_all(response.to_string().as_bytes()).unwrap();
+    let _ = stream
+        .write_all(response.to_string().as_bytes())
+        .map_err(|err| eprintln!("Failed to write {response}: {err}"));
     Ok(())
 }
