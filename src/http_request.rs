@@ -36,6 +36,8 @@ impl HttpRequest {
                 eprintln!("ERROR: invalid Content-Length '{len}': {err}");
             })?;
             let mut buffer = vec![0u8; body_len];
+            // TODO: if the content length is longer than provided bytes this
+            // will just hang. we want some sort of a timeout somewhere
             request.read_exact(&mut buffer).map_err(|err| {
                 eprintln!("ERROR: expected to read {body_len} bytes from body: {err}");
             })?;
