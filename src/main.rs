@@ -1,9 +1,10 @@
 use std::fmt::{self, Display};
-use std::fs;
 use std::io::{BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::str::FromStr;
+use std::time::Duration;
 use std::{env, net::TcpListener, process};
+use std::{fs, thread};
 mod http_request;
 use http_request::HttpRequest;
 
@@ -139,6 +140,10 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
     })?;
     let handler = match (&http_request.verb, http_request.path.as_str()) {
         (HttpVerb::Get, "/") => |_| (HttpCode::Ok, fs::read_to_string("index.html").unwrap()),
+        (HttpVerb::Get, "/sleep") => |_| {
+            thread::sleep(Duration::from_secs(5));
+            (HttpCode::Ok, fs::read_to_string("index.html").unwrap())
+        },
         _ => |_| {
             (
                 HttpCode::NotFound,
