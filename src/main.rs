@@ -138,20 +138,17 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
             .map_err(|err| eprintln!("Failed to write {response}: {err}"));
     })?;
     let handler = match (&http_request.verb, http_request.path.as_str()) {
-        (HttpVerb::Get, "/") => Some(|_| fs::read_to_string("index.html").unwrap()),
-        _ => None,
+        (HttpVerb::Get, "/") => |_| (HttpCode::Ok, fs::read_to_string("index.html").unwrap()),
+        _ => |_| {
+            (
+                HttpCode::NotFound,
+                fs::read_to_string("not_found.html").unwrap(),
+            )
+        },
     };
 
-    let response = match handler {
-        Some(handler) => HttpResponse {
-            code: HttpCode::Ok,
-            body: handler(http_request),
-        },
-        None => HttpResponse {
-            code: HttpCode::NotFound,
-            body: "".to_string(),
-        },
-    };
+    let (code, body) = handler(http_request);
+    let response = HttpResponse { code, body };
 
     println!("\r\nResponse:\r\n{response}");
     let _ = stream
