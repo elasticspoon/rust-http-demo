@@ -1,3 +1,6 @@
+mod http_request;
+use demo_http_server::ThreadPool;
+use http_request::HttpRequest;
 use std::fmt::{self, Display};
 use std::io::{BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
@@ -5,8 +8,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::{env, net::TcpListener, process};
 use std::{fs, thread};
-mod http_request;
-use http_request::HttpRequest;
 
 fn main() {
     // let port = env::var("PORT").map_or_else(|_| 3000, |port| port.parse::<i32>().unwrap_or(3000));
@@ -20,14 +21,17 @@ fn main() {
         process::exit(1);
     });
 
+    let pool = ThreadPool::new(4);
     println!("Listening on {}", listener.local_addr().unwrap());
     for conn in listener.incoming() {
         match conn {
             Ok(stream) => {
                 println!("Accepted connection");
-                let _ = handle_connection(stream);
+                pool.execute(|| {
+                    let _ = handle_connection(stream);
+                });
             }
-            Err(err) => println!("failled to accept connection: {:?}", err),
+            Err(err) => println!("failed to accept connection: {:?}", err),
         }
     }
 }
@@ -144,6 +148,10 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
             thread::sleep(Duration::from_secs(5));
             (HttpCode::Ok, fs::read_to_string("index.html").unwrap())
         },
+        (HttpVerb::Get, "/fib") => |_| {
+            fibonacci(1_000_000_000);
+            (HttpCode::Ok, fs::read_to_string("index.html").unwrap())
+        },
         _ => |_| {
             (
                 HttpCode::NotFound,
@@ -160,4 +168,24 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
         .write_all(response.to_string().as_bytes())
         .map_err(|err| eprintln!("Failed to write {response}: {err}"));
     Ok(())
+}
+
+fn fibonacci(mut n: i128) {
+    let mut a: i128 = 0;
+    let mut b: i128 = 1;
+    while n > 0 {
+        match a.checked_add(b) {
+            Some(sum) => {
+                a = b;
+                b = sum;
+            }
+            None => {
+                a = 0;
+                b = 1;
+            }
+        }
+        n -= 1;
+    }
+
+    println!("a: {a}, b: {b}")
 }
