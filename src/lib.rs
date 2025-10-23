@@ -1,11 +1,10 @@
 use std::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc,
     thread::{self, JoinHandle},
 };
 
 struct Worker {
     id: usize,
-    receiver: mpsc::Receiver<()>,
     thread: JoinHandle<()>,
 }
 
@@ -14,19 +13,15 @@ struct Job {
 }
 
 impl Worker {
-    fn new(id: usize, receiver: Receiver<()>) -> Worker {
+    fn new(id: usize) -> Worker {
         let thread = thread::spawn(|| {});
-        Worker {
-            id,
-            thread,
-            receiver,
-        }
+        Worker { id, thread }
     }
 }
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
-    chan: mpsc::Sender<()>,
+    chan: mpsc::Sender<Job>,
 }
 
 impl ThreadPool {
@@ -38,8 +33,8 @@ impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
-        let (writer, reader) = mpsc::channel();
-        let workers = (0..size).map(|id| Worker::new(id, reader)).collect();
+        let (writer, _) = mpsc::channel();
+        let workers = (0..size).map(Worker::new).collect();
         ThreadPool {
             workers,
             chan: writer,
