@@ -1,14 +1,11 @@
 use std::{
-    sync::{
-        Mutex,
-        mpsc::{self},
-    },
+    sync::mpsc::{self, Receiver, Sender},
     thread::{self, JoinHandle},
 };
 
-struct Worker<'a> {
+struct Worker {
     id: usize,
-    receiver: &'a Mutex<mpsc::Receiver<()>>,
+    receiver: mpsc::Receiver<()>,
     thread: JoinHandle<()>,
 }
 
@@ -16,8 +13,8 @@ struct Job {
     closure: fn() -> (),
 }
 
-impl<'a> Worker<'a> {
-    fn new(id: usize, receiver: &Mutex<mpsc::Receiver<()>>) -> Worker {
+impl Worker {
+    fn new(id: usize, receiver: Receiver<()>) -> Worker {
         let thread = thread::spawn(|| {});
         Worker {
             id,
@@ -27,25 +24,22 @@ impl<'a> Worker<'a> {
     }
 }
 
-pub struct ThreadPool<'a> {
-    workers: Vec<Worker<'a>>,
+pub struct ThreadPool {
+    workers: Vec<Worker>,
     chan: mpsc::Sender<()>,
 }
 
-impl<'a> ThreadPool<'a> {
+impl ThreadPool {
     /// Create a new ThreadPool
     ///
     /// # Panics
     ///
     /// The `new` function will panic is size is less than 1
-    pub fn new(size: usize) -> ThreadPool<'a> {
+    pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
         let (writer, reader) = mpsc::channel();
-        let mut reader = Mutex::new(reader);
-        let workers = (0..size)
-            .map(move |id| Worker::new(id, &mut reader))
-            .collect();
+        let workers = (0..size).map(|id| Worker::new(id, reader)).collect();
         ThreadPool {
             workers,
             chan: writer,
