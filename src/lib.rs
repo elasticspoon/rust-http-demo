@@ -1,11 +1,14 @@
 use std::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        Mutex,
+        mpsc::{self},
+    },
     thread::{self, JoinHandle},
 };
 
 struct Worker<'a> {
     id: usize,
-    receiver: &'a mpsc::Receiver<()>,
+    receiver: &'a Mutex<mpsc::Receiver<()>>,
     thread: JoinHandle<()>,
 }
 
@@ -14,7 +17,7 @@ struct Job {
 }
 
 impl<'a> Worker<'a> {
-    fn new(id: usize, receiver: &Receiver<()>) -> Worker {
+    fn new(id: usize, receiver: &Mutex<mpsc::Receiver<()>>) -> Worker {
         let thread = thread::spawn(|| {});
         Worker {
             id,
@@ -39,7 +42,10 @@ impl<'a> ThreadPool<'a> {
         assert!(size > 0);
 
         let (writer, reader) = mpsc::channel();
-        let workers = (0..size).map(move |id| Worker::new(id, &reader)).collect();
+        let mut reader = Mutex::new(reader);
+        let workers = (0..size)
+            .map(move |id| Worker::new(id, &mut reader))
+            .collect();
         ThreadPool {
             workers,
             chan: writer,
