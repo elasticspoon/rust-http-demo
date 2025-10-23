@@ -3,9 +3,9 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-struct Worker {
+struct Worker<'a> {
     id: usize,
-    receiver: mpsc::Receiver<()>,
+    receiver: &'a mpsc::Receiver<()>,
     thread: JoinHandle<()>,
 }
 
@@ -13,8 +13,8 @@ struct Job {
     closure: fn() -> (),
 }
 
-impl Worker {
-    fn new(id: usize, receiver: Receiver<()>) -> Worker {
+impl<'a> Worker<'a> {
+    fn new(id: usize, receiver: &Receiver<()>) -> Worker {
         let thread = thread::spawn(|| {});
         Worker {
             id,
@@ -24,22 +24,22 @@ impl Worker {
     }
 }
 
-pub struct ThreadPool {
-    workers: Vec<Worker>,
+pub struct ThreadPool<'a> {
+    workers: Vec<Worker<'a>>,
     chan: mpsc::Sender<()>,
 }
 
-impl ThreadPool {
+impl<'a> ThreadPool<'a> {
     /// Create a new ThreadPool
     ///
     /// # Panics
     ///
     /// The `new` function will panic is size is less than 1
-    pub fn new(size: usize) -> ThreadPool {
+    pub fn new(size: usize) -> ThreadPool<'a> {
         assert!(size > 0);
 
         let (writer, reader) = mpsc::channel();
-        let workers = (0..size).map(|id| Worker::new(id, reader)).collect();
+        let workers = (0..size).map(move |id| Worker::new(id, &reader)).collect();
         ThreadPool {
             workers,
             chan: writer,
