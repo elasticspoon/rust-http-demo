@@ -1,5 +1,5 @@
 use std::{
-    sync::mpsc,
+    sync::{Arc, Mutex, mpsc},
     thread::{self, JoinHandle},
 };
 
@@ -8,13 +8,15 @@ struct Worker {
     thread: JoinHandle<()>,
 }
 
-struct Job {
-    closure: fn() -> (),
-}
+type Job = Box<dyn FnOnce() + Send + 'static>;
 
 impl Worker {
-    fn new(id: usize) -> Worker {
-        let thread = thread::spawn(|| {});
+    fn new(id: usize, reader: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+        let thread = thread::spawn(move || {
+            let job = reader.lock().unwrap().recv().unwrap();
+            println!("Worker {id} got a job. Executing...");
+            job();
+        });
         Worker { id, thread }
     }
 }
@@ -33,8 +35,11 @@ impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
-        let (writer, _) = mpsc::channel();
-        let workers = (0..size).map(Worker::new).collect();
+        let (writer, reader) = mpsc::channel();
+        let reader = Arc::new(Mutex::new(reader));
+        let workers = (0..size)
+            .map(|id| Worker::new(id, Arc::clone(&reader)))
+            .collect();
         ThreadPool {
             workers,
             chan: writer,
@@ -44,5 +49,10 @@ impl ThreadPool {
     where
         F: FnOnce() + Send + 'static,
     {
+        let job = Box::new(f);
+        let _ = self
+            .chan
+            .send(job)
+            .map_err(|err| eprintln!("Failed to execute job: {}", err));
     }
 }
