@@ -45,6 +45,7 @@ impl ThreadPool {
             chan: writer,
         }
     }
+
     pub fn execute<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
@@ -54,5 +55,13 @@ impl ThreadPool {
             .chan
             .send(job)
             .map_err(|err| eprintln!("Failed to execute job: {}", err));
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        for worker in &self.workers {
+            worker.thread.join();
+        }
     }
 }
