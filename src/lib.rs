@@ -5,7 +5,7 @@ use std::{
 
 struct Worker {
     id: usize,
-    thread: JoinHandle<()>,
+    thread: Option<JoinHandle<()>>,
 }
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
@@ -17,7 +17,10 @@ impl Worker {
             println!("Worker {id} got a job. Executing...");
             job();
         });
-        Worker { id, thread }
+        Worker {
+            id,
+            thread: Some(thread),
+        }
     }
 }
 
@@ -60,8 +63,8 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        for worker in &self.workers {
-            worker.thread.join();
+        for worker in &mut self.workers {
+            worker.thread.take().unwrap().join().unwrap();
         }
     }
 }
