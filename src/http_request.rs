@@ -4,20 +4,17 @@ use std::fmt::Display;
 use std::io::BufRead;
 use std::str::FromStr;
 
-use super::HttpProtocol;
-use super::HttpVerb;
-
 #[derive(Debug)]
-pub(crate) struct HttpRequest {
-    pub(crate) verb: HttpVerb,
-    pub(crate) protocol: HttpProtocol,
-    pub(crate) path: String,
-    pub(crate) headers: HashMap<String, String>,
-    pub(crate) body: Option<String>,
+pub struct HttpRequest {
+    pub verb: HttpVerb,
+    pub protocol: HttpProtocol,
+    pub path: String,
+    pub headers: HashMap<String, String>,
+    pub body: Option<String>,
 }
 
 impl HttpRequest {
-    pub(crate) fn build(request: &mut dyn BufRead) -> Result<HttpRequest, ()> {
+    pub fn build(request: &mut dyn BufRead) -> Result<HttpRequest, ()> {
         let header_line = request.lines().next().unwrap().unwrap();
         let (verb, path, protocol) = build_start_line(header_line)?;
 
@@ -81,6 +78,101 @@ fn build_start_line(start_line: String) -> Result<(HttpVerb, String, HttpProtoco
     } else {
         eprintln!("invalid start_line");
         Err(())
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum HttpProtocol {
+    OnePointOne,
+}
+
+impl FromStr for HttpProtocol {
+    type Err = ();
+
+    fn from_str(protocol: &str) -> Result<Self, Self::Err> {
+        match protocol {
+            "HTTP/1.1" => Ok(HttpProtocol::OnePointOne),
+            _ => {
+                eprintln!("ERROR: invalid protocol in request: '{protocol}'");
+                Err(())
+            }
+        }
+    }
+}
+
+impl Display for HttpProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let protocol = match self {
+            HttpProtocol::OnePointOne => "HTTP/1.1",
+        };
+        write!(f, "{protocol}")
+    }
+}
+#[derive(Debug, PartialEq)]
+pub enum HttpVerb {
+    Get,
+    Post,
+    Put,
+}
+
+impl Display for HttpVerb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let verb = match self {
+            HttpVerb::Get => "GET",
+            HttpVerb::Post => "POST",
+            HttpVerb::Put => "PUT",
+        };
+        write!(f, "{verb}",)
+    }
+}
+
+impl FromStr for HttpVerb {
+    type Err = ();
+
+    fn from_str(verb: &str) -> Result<Self, Self::Err> {
+        match verb {
+            "GET" => Ok(HttpVerb::Get),
+            "POST" => Ok(HttpVerb::Post),
+            "PUT" => Ok(HttpVerb::Put),
+            _ => {
+                eprintln!("ERROR: Invalid HTTP verb: '{verb}'");
+                Err(())
+            }
+        }
+    }
+}
+
+pub struct HttpResponse {
+    pub code: HttpCode,
+    pub body: String,
+}
+
+impl fmt::Display for HttpResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let resp_header = format!("HTTP/1.1 {}", self.code);
+        write!(
+            f,
+            "{resp_header}\r\nContent-Length: {}\r\n\r\n{}",
+            self.body.len(),
+            self.body
+        )
+    }
+}
+
+pub enum HttpCode {
+    Ok,
+    NotFound,
+    BadRequest,
+}
+
+impl Display for HttpCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (code, val) = match self {
+            HttpCode::Ok => (200, "OK".to_string()),
+            HttpCode::NotFound => (404, "NOT FOUND".to_string()),
+            HttpCode::BadRequest => (400, "BAD REQUEST".to_string()),
+        };
+        write!(f, "{} {}", code, val)
     }
 }
 
