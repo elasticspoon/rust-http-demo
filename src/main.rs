@@ -23,7 +23,7 @@ fn main() {
 
     let pool = ThreadPool::new(4);
     println!("Listening on {}", listener.local_addr().unwrap());
-    for conn in listener.incoming() {
+    for conn in listener.incoming().take(2) {
         match conn {
             Ok(stream) => {
                 println!("Accepted connection");

@@ -13,9 +13,19 @@ type Job = Box<dyn FnOnce() + Send + 'static>;
 impl Worker {
     fn new(id: usize, reader: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
         let thread = thread::spawn(move || {
-            let job = reader.lock().unwrap().recv().unwrap();
-            println!("Worker {id} got a job. Executing...");
-            job();
+            loop {
+                let lock = reader.lock().expect("could not accquire lock");
+                match lock.recv() {
+                    Ok(job) => {
+                        println!("Worker {id} got a job. Executing...");
+                        job();
+                    }
+                    Err(_) => {
+                        eprintln!("Channel is closed...");
+                        break;
+                    }
+                };
+            }
         });
         Worker {
             id,
@@ -26,7 +36,7 @@ impl Worker {
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
-    chan: mpsc::Sender<Job>,
+    chan: Option<mpsc::Sender<Job>>,
 }
 
 impl ThreadPool {
@@ -45,7 +55,7 @@ impl ThreadPool {
             .collect();
         ThreadPool {
             workers,
-            chan: writer,
+            chan: Some(writer),
         }
     }
 
@@ -56,6 +66,8 @@ impl ThreadPool {
         let job = Box::new(f);
         let _ = self
             .chan
+            .as_ref()
+            .unwrap()
             .send(job)
             .map_err(|err| eprintln!("Failed to execute job: {}", err));
     }
@@ -63,7 +75,10 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
+        drop(self.chan.take());
+
         for worker in &mut self.workers {
+            println!("Shutting down worker {}...", worker.id);
             worker.thread.take().unwrap().join().unwrap();
         }
     }
