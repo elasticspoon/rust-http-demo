@@ -14,8 +14,8 @@ impl Worker {
     fn new(id: usize, reader: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
         let thread = thread::spawn(move || {
             loop {
-                let lock = reader.lock().expect("could not accquire lock");
-                match lock.recv() {
+                let message = reader.lock().expect("could not accquire lock").recv();
+                match message {
                     Ok(job) => {
                         println!("Worker {id} got a job. Executing...");
                         job();
