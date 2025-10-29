@@ -37,11 +37,18 @@ pub struct ThreadPool {
 }
 
 impl ThreadPool {
-    /// Create a new ThreadPool
+    /// Create a new ThreadPool with `size` number of threads to execute tasks.
     ///
     /// # Panics
     ///
-    /// The `new` function will panic is size is less than 1
+    /// The `new` function will panic is size is less than 1.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use thread_pool::ThreadPool;
+    ///
+    /// let pool = ThreadPool::new(3);
+    /// ```
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
@@ -56,6 +63,7 @@ impl ThreadPool {
         }
     }
 
+    /// Executes a lambda on the thread pool.
     pub fn execute<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
