@@ -57,13 +57,19 @@ impl HttpRequest {
 impl Display for HttpRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let body = self.body.as_deref().unwrap_or("");
+        let headers = self
+            .headers
+            .iter()
+            .map(|(key, value)| format!("{key}: {value}"))
+            .collect::<Vec<String>>()
+            .join("\n");
         write!(
             f,
-            "{verb} {path} {protocol}\r\n{headers:#?}\r\n\r\n{body:?}",
+            "{verb} {path} {protocol}\r\n{headers}\r\n\r\n{body:?}",
             verb = self.verb,
             path = self.path,
             protocol = self.protocol,
-            headers = self.headers,
+            headers = headers,
         )
     }
 }
