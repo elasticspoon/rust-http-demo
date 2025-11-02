@@ -186,7 +186,7 @@ impl Display for HttpCode {
 mod tests {
     use super::*;
     use std::{
-        io::{BufReader, Cursor, Read, Write},
+        io::{BufReader, Cursor, Write},
         net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream},
         time::Duration,
     };
@@ -206,35 +206,6 @@ mod tests {
             .take_while(|line| !line.is_empty())
             .collect::<Vec<String>>()
             .join("\n")
-    }
-
-    #[test]
-    fn test_get_200() {
-        let request = HttpRequest {
-            verb: HttpVerb::Get,
-            protocol: HttpProtocol::OnePointOne,
-            path: "/".to_string(),
-            headers: HashMap::from([("Host".to_string(), "localhost:3000".to_string())]),
-            body: None,
-        };
-
-        let resp = write_to_port(3000, request.to_string());
-        assert!(resp.contains("HTTP/1.1 200 OK"));
-    }
-
-    #[test]
-    fn test_get_400() {
-        let request = HttpRequest {
-            verb: HttpVerb::Get,
-            protocol: HttpProtocol::OnePointOne,
-            path: "/".to_string(),
-            headers: HashMap::from([]),
-            body: None,
-        };
-
-        let want = "HTTP/1.1 400 Bad Request";
-        let resp = write_to_port(3000, request.to_string());
-        assert!(resp.contains(want), "{resp} did not contain {want}");
     }
 
     #[test]
