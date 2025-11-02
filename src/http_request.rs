@@ -185,7 +185,57 @@ impl Display for HttpCode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::{
+        io::{BufReader, Cursor, Read, Write},
+        net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream},
+        time::Duration,
+    };
+
+    fn write_to_port(port: u16, content: String) -> String {
+        let addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), port));
+        let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(2))
+            .expect("should have bound to port 3000");
+        stream
+            .write_all(content.as_bytes())
+            .expect("should have written to socket");
+
+        let buf_reader = BufReader::new(&stream);
+        buf_reader
+            .lines()
+            .map(|result| result.unwrap())
+            .take_while(|line| !line.is_empty())
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn test_get_200() {
+        let request = HttpRequest {
+            verb: HttpVerb::Get,
+            protocol: HttpProtocol::OnePointOne,
+            path: "/".to_string(),
+            headers: HashMap::from([("Host".to_string(), "localhost:3000".to_string())]),
+            body: None,
+        };
+
+        let resp = write_to_port(3000, request.to_string());
+        assert!(resp.contains("HTTP/1.1 200 OK"));
+    }
+
+    #[test]
+    fn test_get_400() {
+        let request = HttpRequest {
+            verb: HttpVerb::Get,
+            protocol: HttpProtocol::OnePointOne,
+            path: "/".to_string(),
+            headers: HashMap::from([]),
+            body: None,
+        };
+
+        let want = "HTTP/1.1 400 Bad Request";
+        let resp = write_to_port(3000, request.to_string());
+        assert!(resp.contains(want), "{resp} did not contain {want}");
+    }
 
     #[test]
     fn test_build_success() {
