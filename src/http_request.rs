@@ -1,3 +1,4 @@
+use crate::{HttpProtocol, HttpVerb};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
@@ -87,126 +88,10 @@ fn build_start_line(start_line: String) -> Result<(HttpVerb, String, HttpProtoco
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum HttpProtocol {
-    OnePointOne,
-}
-
-impl FromStr for HttpProtocol {
-    type Err = ();
-
-    fn from_str(protocol: &str) -> Result<Self, Self::Err> {
-        match protocol {
-            "HTTP/1.1" => Ok(HttpProtocol::OnePointOne),
-            _ => {
-                eprintln!("ERROR: invalid protocol in request: '{protocol}'");
-                Err(())
-            }
-        }
-    }
-}
-
-impl Display for HttpProtocol {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let protocol = match self {
-            HttpProtocol::OnePointOne => "HTTP/1.1",
-        };
-        write!(f, "{protocol}")
-    }
-}
-#[derive(Debug, PartialEq)]
-pub enum HttpVerb {
-    Get,
-    Post,
-    Put,
-}
-
-impl Display for HttpVerb {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let verb = match self {
-            HttpVerb::Get => "GET",
-            HttpVerb::Post => "POST",
-            HttpVerb::Put => "PUT",
-        };
-        write!(f, "{verb}",)
-    }
-}
-
-impl FromStr for HttpVerb {
-    type Err = ();
-
-    fn from_str(verb: &str) -> Result<Self, Self::Err> {
-        match verb {
-            "GET" => Ok(HttpVerb::Get),
-            "POST" => Ok(HttpVerb::Post),
-            "PUT" => Ok(HttpVerb::Put),
-            _ => {
-                eprintln!("ERROR: Invalid HTTP verb: '{verb}'");
-                Err(())
-            }
-        }
-    }
-}
-
-pub struct HttpResponse {
-    pub code: HttpCode,
-    pub body: String,
-}
-
-impl fmt::Display for HttpResponse {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let resp_header = format!("HTTP/1.1 {}", self.code);
-        write!(
-            f,
-            "{resp_header}\r\nContent-Length: {}\r\n\r\n{}",
-            self.body.len(),
-            self.body
-        )
-    }
-}
-
-pub enum HttpCode {
-    Ok,
-    NotFound,
-    BadRequest,
-}
-
-impl Display for HttpCode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (code, val) = match self {
-            HttpCode::Ok => (200, "OK".to_string()),
-            HttpCode::NotFound => (404, "NOT FOUND".to_string()),
-            HttpCode::BadRequest => (400, "BAD REQUEST".to_string()),
-        };
-        write!(f, "{} {}", code, val)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        io::{BufReader, Cursor, Write},
-        net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream},
-        time::Duration,
-    };
-
-    fn write_to_port(port: u16, content: String) -> String {
-        let addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), port));
-        let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(2))
-            .expect("should have bound to port 3000");
-        stream
-            .write_all(content.as_bytes())
-            .expect("should have written to socket");
-
-        let buf_reader = BufReader::new(&stream);
-        buf_reader
-            .lines()
-            .map(|result| result.unwrap())
-            .take_while(|line| !line.is_empty())
-            .collect::<Vec<String>>()
-            .join("\n")
-    }
+    use std::io::Cursor;
 
     #[test]
     fn test_build_success() {

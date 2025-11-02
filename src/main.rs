@@ -1,7 +1,4 @@
-use demo_http_server::HttpCode;
-use demo_http_server::HttpVerb;
-use demo_http_server::ThreadPool;
-use demo_http_server::{HttpRequest, HttpResponse};
+use demo_http_server::{HttpCode, HttpRequest, HttpResponse, HttpVerb, ThreadPool};
 use std::io::{BufReader, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::time::Duration;
