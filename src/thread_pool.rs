@@ -45,7 +45,7 @@ impl ThreadPool {
     ///
     /// # Examples
     /// ```rust
-    /// use thread_pool::ThreadPool;
+    /// use demo_http_server::ThreadPool;
     ///
     /// let pool = ThreadPool::new(3);
     /// ```
@@ -88,4 +88,3 @@ impl Drop for ThreadPool {
         }
     }
 }
-
