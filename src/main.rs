@@ -33,6 +33,16 @@ fn main() {
 
 fn handle_connection(mut stream: TcpStream) -> Result<(), ()> {
     let mut buf_reader = BufReader::new(&stream);
+    // let res = buf_reader
+    //     .lines()
+    //     .map(|result| result.unwrap())
+    //     .take_while(|line| !line.is_empty())
+    //     .collect::<Vec<String>>()
+    //     .join("\n");
+    //
+    // println!("{}", res);
+    // return Ok(());
+
     let http_request = HttpRequest::build(&mut buf_reader).map_err(|_| {
         let response = HttpResponse {
             code: HttpCode::BadRequest,
